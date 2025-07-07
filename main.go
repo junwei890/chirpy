@@ -13,9 +13,9 @@ func main() {
 	// Endpoints
 	const appPath = "/app/"
 	const prefixToStrip = "/app"
-	const readinessPath = "/healthz"
-	const metricsPath = "/metrics"
-	const resetPath = "/reset"
+	const readinessPath = "GET /healthz"
+	const metricsPath = "GET /metrics"
+	const resetPath = "POST /reset"
 
 	// Creating app state
 	ptrToAppState := &state.APIConfig{}
@@ -26,7 +26,9 @@ func main() {
 	// Registering handlers to the multiplexer
 
 	// File system
+	// Defining my file system
 	fileSystem := http.Dir(root)
+	// Returns a handler that serves files from my filesystem
 	fileSystemHandler := http.FileServer(fileSystem)
 
 	// Readiness
