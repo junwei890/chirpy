@@ -10,7 +10,7 @@ import (
 func main() {
 	const root = "."
 	const port = ":8080"
-	// Endpoints
+
 	const appPath = "/app/"
 	const prefixToStrip = "/app"
 	const readinessPath = "GET /api/healthz" 

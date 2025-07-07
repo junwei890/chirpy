@@ -16,10 +16,10 @@ func Readiness(writer http.ResponseWriter, req *http.Request) {
 }
 
 func ValidateChirp(writer http.ResponseWriter, req *http.Request) {
-	unallowedWords := map[string]int{
-		"kerfuffle": 1,
-		"sharbert": 2,
-		"fornax": 3,
+	unallowedWords := map[string]struct{}{
+		"kerfuffle": {},
+		"sharbert": {},
+		"fornax": {},
 	}
 	type responseError struct {
 		Error string `json:"error"`
@@ -49,8 +49,9 @@ func ValidateChirp(writer http.ResponseWriter, req *http.Request) {
 		}
 		return
 	}
-
-	if len(dataReceived.Body) > 140 {
+	
+	chirp := dataReceived.Body
+	if len(chirp) > 140 {
 		badRequestResponse := responseError{
 			Error: "Chirp is too long",
 		}
@@ -67,7 +68,6 @@ func ValidateChirp(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	chirp := dataReceived.Body
 	chirpSlice := strings.Split(chirp, " ")
 	for index, word := range chirpSlice {
 		if _, ok := unallowedWords[strings.ToLower(word)]; ok {
