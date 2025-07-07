@@ -13,9 +13,10 @@ func main() {
 	// Endpoints
 	const appPath = "/app/"
 	const prefixToStrip = "/app"
-	const readinessPath = "GET /healthz"
-	const metricsPath = "GET /metrics"
-	const resetPath = "POST /reset"
+	const readinessPath = "GET /api/healthz" 
+	const metricsPath = "GET /admin/metrics"
+	const resetPath = "POST /admin/reset"
+	const validationPath = "POST /api/validate_chirp"
 
 	// Creating app state
 	ptrToAppState := &state.APIConfig{}
@@ -26,8 +27,7 @@ func main() {
 	// Registering handlers to the multiplexer
 
 	// File system
-	// Defining my file system
-	fileSystem := http.Dir(root)
+	fileSystem := http.Dir(root) // Defining my file system
 	// Returns a handler that serves files from my filesystem
 	fileSystemHandler := http.FileServer(fileSystem)
 
@@ -40,6 +40,9 @@ func main() {
 	// Metrics
 	requestMultiplexer.HandleFunc(metricsPath, ptrToAppState.Metrics)
 	requestMultiplexer.HandleFunc(resetPath, ptrToAppState.Reset)
+
+	// Validate chirp length
+	requestMultiplexer.HandleFunc(validationPath, custom.ValidateChirp)
 
 	// Creating a server struct and running it
 	server := &http.Server{
