@@ -4,9 +4,9 @@ import (
 	"log"
 	"net/http"
 	"encoding/json"
+	"strings"
 )
 
-// Custom handler to check if server is ready for requests, writing how we will respond to requests
 func Readiness(writer http.ResponseWriter, req *http.Request) {
 	writer.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	writer.WriteHeader(http.StatusOK)
@@ -16,11 +16,16 @@ func Readiness(writer http.ResponseWriter, req *http.Request) {
 }
 
 func ValidateChirp(writer http.ResponseWriter, req *http.Request) {
-	type validResponse struct {
-		Valid bool `json:"valid"`
+	unallowedWords := map[string]int{
+		"kerfuffle": 1,
+		"sharbert": 2,
+		"fornax": 3,
 	}
 	type responseError struct {
 		Error string `json:"error"`
+	}
+	type validResponse struct {
+		CleanedBody string `json:"cleaned_body"`
 	}
 	type requestBody struct {
 		Body string `json:"body"`
@@ -36,7 +41,7 @@ func ValidateChirp(writer http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			log.Println(err)
 		}
-
+		
 		writer.Header().Set("Content-Type", "application/json")
 		writer.WriteHeader(http.StatusBadRequest)
 		if _, err := writer.Write(badRequestResponseJSON); err != nil {
@@ -62,17 +67,25 @@ func ValidateChirp(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	statusOKResponse := validResponse{
-		Valid: true,
+	chirp := dataReceived.Body
+	chirpSlice := strings.Split(chirp, " ")
+	for index, word := range chirpSlice {
+		if _, ok := unallowedWords[strings.ToLower(word)]; ok {
+			chirpSlice[index] = "****"
+		}
 	}
-	statusOKResponseJSON, err := json.Marshal(statusOKResponse)
+	cleanedChirp := strings.Join(chirpSlice, " ")
+
+	responseBody := &validResponse{
+		CleanedBody: cleanedChirp,
+	}
+	responseBodyJSON, err := json.Marshal(responseBody)
 	if err != nil {
 		log.Println(err)
 	}
-
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusOK)
-	if _, err := writer.Write(statusOKResponseJSON); err != nil {
+	if _, err := writer.Write(responseBodyJSON); err != nil {
 		log.Println(err)
 	}
 }
