@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"log"
 	"io"
-	"encoding/json"
 	"time"
+	"encoding/json"
 	"strings"
 	"github.com/junwei890/chirpy/internal/database"
 	"github.com/google/uuid"
@@ -63,6 +63,7 @@ func (a *APIConfig) NewUser(writer http.ResponseWriter, req *http.Request) {
 	type requestBody struct {
 		Email string `json:"email"`
 	}
+
 	type validResponse struct {
 		ID uuid.UUID `json:"id"`
 		Email string `json:"email"`
@@ -90,6 +91,7 @@ func (a *APIConfig) NewUser(writer http.ResponseWriter, req *http.Request) {
 		CreatedAt: userCreationDetails.CreatedAt,
 		UpdatedAt: userCreationDetails.UpdatedAt,
 	}
+
 	userCreationDetailsInBytes, err := json.Marshal(formattedUserCreationDetails)
 	if err != nil {
 		log.Println(err)
@@ -108,10 +110,10 @@ func (a *APIConfig) NewChirp(writer http.ResponseWriter, req *http.Request) {
 	}
 	type validResponse struct {
 		ID uuid.UUID `json:"id"`
-		CreatedAt time.Time `json:"created_at"`
-		UpdatedAt time.Time `json:"updated_at"`
 		Body string `json:"body"`
 		UserID uuid.UUID `json:"user_id"`
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
 	}
 
 	dataReceivedInBytes, err := io.ReadAll(req.Body)
@@ -147,19 +149,57 @@ func (a *APIConfig) NewChirp(writer http.ResponseWriter, req *http.Request) {
 		ErrorResponseWriter(writer, DatabaseError)
 		return
 	}
-
 	formattedChirpCreationDetails := validResponse{
 		ID: createdChirp.ID,
+		Body: chirp,
+		UserID: createdChirp.UserID,
 		CreatedAt: createdChirp.CreatedAt,
 		UpdatedAt: createdChirp.UpdatedAt,
-		Body: createdChirp.Body,
-		UserID: createdChirp.UserID,
 	}
+
 	chirpCreationDetailsInBytes, err := json.Marshal(formattedChirpCreationDetails)
 	if err != nil {
 		log.Println(err)
 	}
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusCreated)
-	writer.Write(chirpCreationDetailsInBytes)
+	if _, err := writer.Write(chirpCreationDetailsInBytes); err != nil {
+		log.Println(err)
+	}
+}
+
+func (a *APIConfig) AllChirps(writer http.ResponseWriter, req *http.Request) {
+	type oneChirp struct {
+		ID uuid.UUID `json:"id"`
+		Body string `json:"body"`
+		UserID uuid.UUID `json:"user_id"`
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
+	}
+
+	sliceOfAllChirps, err := a.PtrToQueries.GetAllChirps(req.Context())
+	if err != nil {
+		ErrorResponseWriter(writer, DatabaseError)
+	}
+	var sliceOfFormattedChirps []oneChirp
+	for _, chirp := range sliceOfAllChirps {
+		formattedChirp := oneChirp{
+			ID: chirp.ID,
+			Body: chirp.Body,
+			UserID: chirp.UserID,
+			CreatedAt: chirp.CreatedAt,
+			UpdatedAt: chirp.UpdatedAt,
+		}
+		sliceOfFormattedChirps = append(sliceOfFormattedChirps, formattedChirp)
+	}
+	
+	allChirpsInBytes, err := json.Marshal(sliceOfFormattedChirps)
+	if err != nil {
+		log.Println(err)
+	}
+	writer.Header().Set("Content-Type", "application/json")
+	writer.WriteHeader(http.StatusOK)
+	if _, err := writer.Write(allChirpsInBytes); err != nil {
+		log.Println(err)
+	}
 }

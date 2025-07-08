@@ -42,6 +42,7 @@ func main() {
 	const metricsResetPath = "POST /admin/reset"
 	const newUserPath = "POST /api/users"
 	const newChirpPath = "POST /api/chirps"
+	const allChirpsPath = "GET /api/chirps"
 
 	requestMultiplexer := http.NewServeMux()
 	fileSystem := http.Dir(root)
@@ -57,6 +58,8 @@ func main() {
 
 	// Chirp related
 	requestMultiplexer.HandleFunc(newChirpPath, ptrToAppState.NewChirp)
+	requestMultiplexer.HandleFunc(allChirpsPath, ptrToAppState.AllChirps)
+
 	// User related
 	requestMultiplexer.HandleFunc(newUserPath, ptrToAppState.NewUser)
 
