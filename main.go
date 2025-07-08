@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	_ "github.com/lib/pq"
 	"github.com/joho/godotenv"
-	"github.com/junwei890/chirpy/custom"
 	"github.com/junwei890/chirpy/state"
 	"github.com/junwei890/chirpy/internal/database"
 )
@@ -22,9 +21,15 @@ func main() {
 	dbQueries := database.New(db)
 
 	platform := os.Getenv("PLATFORM")
+
 	ptrToAppState := &state.APIConfig{
 		PtrToQueries: dbQueries,
 		Platform: platform,
+		Profanities: map[string]struct{}{
+			"kerfuffle": {},
+			"sharbert": {},
+			"fornax": {},
+		},
 	}
 
 	const root = "."
@@ -35,23 +40,24 @@ func main() {
 	const getReadinessPath = "GET /api/healthz" 
 	const getMetricsPath = "GET /admin/metrics"
 	const metricsResetPath = "POST /admin/reset"
-	const chirpValidationPath = "POST /api/validate_chirp"
 	const newUserPath = "POST /api/users"
+	const newChirpPath = "POST /api/chirps"
 
 	requestMultiplexer := http.NewServeMux()
-
 	fileSystem := http.Dir(root)
 	fileSystemHandler := http.FileServer(fileSystem)
 
-	requestMultiplexer.HandleFunc(getReadinessPath, custom.Readiness)
+	// Server readiness
+	requestMultiplexer.HandleFunc(getReadinessPath, state.Readiness)
 
+	// Metrics
 	requestMultiplexer.Handle(appPath, http.StripPrefix(prefixToStrip, ptrToAppState.MiddlewareMetricsInc(fileSystemHandler)))
-
 	requestMultiplexer.HandleFunc(getMetricsPath, ptrToAppState.Metrics)
 	requestMultiplexer.HandleFunc(metricsResetPath, ptrToAppState.Reset)
 
-	requestMultiplexer.HandleFunc(chirpValidationPath, custom.ValidateChirp)
-
+	// Chirp related
+	requestMultiplexer.HandleFunc(newChirpPath, ptrToAppState.NewChirp)
+	// User related
 	requestMultiplexer.HandleFunc(newUserPath, ptrToAppState.NewUser)
 
 	server := &http.Server{

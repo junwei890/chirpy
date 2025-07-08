@@ -8,6 +8,7 @@ import (
 	"io"
 	"encoding/json"
 	"time"
+	"strings"
 	"github.com/junwei890/chirpy/internal/database"
 	"github.com/google/uuid"
 )
@@ -16,6 +17,16 @@ type APIConfig struct {
 	FileServerHits atomic.Int32
 	PtrToQueries *database.Queries
 	Platform string
+	Profanities map[string]struct{}
+}
+
+
+func Readiness(writer http.ResponseWriter, req *http.Request) {
+	writer.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	writer.WriteHeader(http.StatusOK)
+	if _, err := writer.Write([]byte(http.StatusText(http.StatusOK))); err != nil {
+		log.Println(err)
+	}
 }
 
 func (a *APIConfig) MiddlewareMetricsInc(toHandle http.Handler) http.Handler {
@@ -41,20 +52,16 @@ func (a *APIConfig) Metrics(writer http.ResponseWriter, req *http.Request) {
 func (a *APIConfig) Reset(writer http.ResponseWriter, req *http.Request) {
 	a.FileServerHits.Store(0)
 	if a.Platform != "dev" {
-		writer.WriteHeader(http.StatusForbidden)
-		return
+		ErrorResponseWriter(writer, Forbidden)
 	}
 	if err := a.PtrToQueries.DeleteUsers(req.Context()); err != nil {
-		log.Println(err)
+		ErrorResponseWriter(writer, DatabaseError)
 	}
 }
 
 func (a *APIConfig) NewUser(writer http.ResponseWriter, req *http.Request) {
 	type requestBody struct {
 		Email string `json:"email"`
-	}
-	type responseError struct {
-		Error string `json:"error"`
 	}
 	type validResponse struct {
 		ID uuid.UUID `json:"id"`
@@ -69,22 +76,13 @@ func (a *APIConfig) NewUser(writer http.ResponseWriter, req *http.Request) {
 	}
 	dataReceived := &requestBody{}
 	if err := json.Unmarshal(dataReceivedInBytes, dataReceived); err != nil {
-		badRequestResponse := responseError{
-			Error: "Something went wrong",
-		}
-		badRequestResponseInBytes, err := json.Marshal(badRequestResponse)
-		if err != nil {
-			log.Println(err)
-		}
-		writer.Header().Set("Content-Type", "application/json")
-		writer.WriteHeader(http.StatusBadRequest)
-		writer.Write(badRequestResponseInBytes)
+		ErrorResponseWriter(writer, BadRequest)
 		return
 	}
 
 	userCreationDetails, err := a.PtrToQueries.CreateUser(req.Context(), dataReceived.Email)
 	if err != nil {
-		log.Println(err)
+		ErrorResponseWriter(writer, DatabaseError)
 	}
 	formattedUserCreationDetails := validResponse{
 		ID: userCreationDetails.ID,
@@ -101,4 +99,67 @@ func (a *APIConfig) NewUser(writer http.ResponseWriter, req *http.Request) {
 	if _, err := writer.Write(userCreationDetailsInBytes); err != nil {
 		log.Println(err)
 	}
+}
+
+func (a *APIConfig) NewChirp(writer http.ResponseWriter, req *http.Request) {
+	type requestBody struct {
+		Body string `json:"body"`
+		UserID uuid.UUID `json:"user_id"`
+	}
+	type validResponse struct {
+		ID uuid.UUID `json:"id"`
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
+		Body string `json:"body"`
+		UserID uuid.UUID `json:"user_id"`
+	}
+
+	dataReceivedInBytes, err := io.ReadAll(req.Body)
+	if err != nil {
+		log.Println(err)
+	}
+	dataReceived := &requestBody{}
+	if err := json.Unmarshal(dataReceivedInBytes, dataReceived); err != nil {
+		ErrorResponseWriter(writer, BadRequest)
+		return
+	}
+
+	if len(dataReceived.Body) > 140 {
+		ErrorResponseWriter(writer, LongChirp)
+		return
+	}
+
+
+	chirpInSlice := strings.Split(dataReceived.Body, " ")
+	for index, word := range chirpInSlice {
+		if _, ok := a.Profanities[word]; ok {
+			chirpInSlice[index] = "****"
+		}
+	}
+	chirp := strings.Join(chirpInSlice, " ")
+
+	createChirpParams := database.CreateChirpParams{
+		Body: chirp,
+		UserID: dataReceived.UserID,
+	}
+	createdChirp, err := a.PtrToQueries.CreateChirp(req.Context(), createChirpParams)
+	if err != nil {
+		ErrorResponseWriter(writer, DatabaseError)
+		return
+	}
+
+	formattedChirpCreationDetails := validResponse{
+		ID: createdChirp.ID,
+		CreatedAt: createdChirp.CreatedAt,
+		UpdatedAt: createdChirp.UpdatedAt,
+		Body: createdChirp.Body,
+		UserID: createdChirp.UserID,
+	}
+	chirpCreationDetailsInBytes, err := json.Marshal(formattedChirpCreationDetails)
+	if err != nil {
+		log.Println(err)
+	}
+	writer.Header().Set("Content-Type", "application/json")
+	writer.WriteHeader(http.StatusCreated)
+	writer.Write(chirpCreationDetailsInBytes)
 }
