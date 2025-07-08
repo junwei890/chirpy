@@ -3,11 +3,26 @@ package main
 import (
 	"net/http"
 	"log"
+	"os"
+	"database/sql"
+	_ "github.com/lib/pq"
 	"github.com/junwei890/chirpy/custom"
 	"github.com/junwei890/chirpy/state"
+	"github.com/junwei890/chirpy/internal/database"
 )
 
 func main() {
+	dbURL := os.Getenv("DB_URL")
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+	dbQueries := database.New(db)
+
+	ptrToAppState := &state.APIConfig{
+		PtrToQueries: dbQueries,
+	}
+
 	const root = "."
 	const port = ":8080"
 
@@ -17,8 +32,6 @@ func main() {
 	const metricsPath = "GET /admin/metrics"
 	const resetPath = "POST /admin/reset"
 	const validationPath = "POST /api/validate_chirp"
-
-	ptrToAppState := &state.APIConfig{}
 
 	requestMultiplexer := http.NewServeMux()
 

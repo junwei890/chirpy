@@ -5,10 +5,12 @@ import (
 	"net/http"
 	"fmt"
 	"log"
+	"github.com/junwei890/chirpy/internal/database"
 )
 
 type APIConfig struct {
 	FileServerHits atomic.Int32
+	PtrToQueries *database.Queries
 }
 
 func (a *APIConfig) MiddlewareMetricsInc(toHandle http.Handler) http.Handler {
