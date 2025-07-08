@@ -37,31 +37,33 @@ func main() {
 
 	const appPath = "/app/"
 	const prefixToStrip = "/app"
-	const getReadinessPath = "GET /api/healthz" 
-	const getMetricsPath = "GET /admin/metrics"
-	const metricsResetPath = "POST /admin/reset"
-	const newUserPath = "POST /api/users"
-	const newChirpPath = "POST /api/chirps"
-	const allChirpsPath = "GET /api/chirps"
+	const getReadiness = "GET /api/healthz" 
+	const getMetrics = "GET /admin/metrics"
+	const postMetrics = "POST /admin/reset"
+	const postUsers = "POST /api/users"
+	const postChirps = "POST /api/chirps"
+	const getChirps = "GET /api/chirps"
+	const getChirp = "GET /api/chirps/{chirpID}"
 
 	requestMultiplexer := http.NewServeMux()
 	fileSystem := http.Dir(root)
 	fileSystemHandler := http.FileServer(fileSystem)
 
 	// Server readiness
-	requestMultiplexer.HandleFunc(getReadinessPath, state.Readiness)
+	requestMultiplexer.HandleFunc(getReadiness, state.GetReadiness)
 
 	// Metrics
 	requestMultiplexer.Handle(appPath, http.StripPrefix(prefixToStrip, ptrToAppState.MiddlewareMetricsInc(fileSystemHandler)))
-	requestMultiplexer.HandleFunc(getMetricsPath, ptrToAppState.Metrics)
-	requestMultiplexer.HandleFunc(metricsResetPath, ptrToAppState.Reset)
+	requestMultiplexer.HandleFunc(getMetrics, ptrToAppState.GetMetrics)
+	requestMultiplexer.HandleFunc(postMetrics, ptrToAppState.PostMetrics)
 
 	// Chirp related
-	requestMultiplexer.HandleFunc(newChirpPath, ptrToAppState.NewChirp)
-	requestMultiplexer.HandleFunc(allChirpsPath, ptrToAppState.AllChirps)
+	requestMultiplexer.HandleFunc(postChirps, ptrToAppState.PostChirps)
+	requestMultiplexer.HandleFunc(getChirps, ptrToAppState.GetChirps)
+	requestMultiplexer.HandleFunc(getChirp, ptrToAppState.GetChirp)
 
 	// User related
-	requestMultiplexer.HandleFunc(newUserPath, ptrToAppState.NewUser)
+	requestMultiplexer.HandleFunc(postUsers, ptrToAppState.PostUsers)
 
 	server := &http.Server{
 		Addr: port,

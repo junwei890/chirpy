@@ -10,6 +10,7 @@ type Error int
 const (
 	DatabaseError Error = iota
 	BadRequest
+	NotFound
 	Forbidden
 	LongChirp
 )
@@ -28,6 +29,9 @@ func ErrorResponseWriter(writer http.ResponseWriter, error Error) {
 	case BadRequest:
 		errorMessage = "Bad request, try again"
 		statusCode = http.StatusBadRequest
+	case NotFound:
+		errorMessage = "Not Found, try again"
+		statusCode = http.StatusNotFound
 	case Forbidden:
 		errorMessage = "You're not allowed to use this endpoint"
 		statusCode = http.StatusForbidden

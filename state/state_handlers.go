@@ -21,7 +21,7 @@ type APIConfig struct {
 }
 
 
-func Readiness(writer http.ResponseWriter, req *http.Request) {
+func GetReadiness(writer http.ResponseWriter, req *http.Request) {
 	writer.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	writer.WriteHeader(http.StatusOK)
 	if _, err := writer.Write([]byte(http.StatusText(http.StatusOK))); err != nil {
@@ -36,7 +36,7 @@ func (a *APIConfig) MiddlewareMetricsInc(toHandle http.Handler) http.Handler {
 	})
 }
 
-func (a *APIConfig) Metrics(writer http.ResponseWriter, req *http.Request) {
+func (a *APIConfig) GetMetrics(writer http.ResponseWriter, req *http.Request) {
 	writer.Header().Set("Content-Type", "text/html")
 	serverHits := fmt.Sprintf(`<html>
   <body>
@@ -49,17 +49,19 @@ func (a *APIConfig) Metrics(writer http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (a *APIConfig) Reset(writer http.ResponseWriter, req *http.Request) {
+func (a *APIConfig) PostMetrics(writer http.ResponseWriter, req *http.Request) {
 	a.FileServerHits.Store(0)
 	if a.Platform != "dev" {
 		ErrorResponseWriter(writer, Forbidden)
+		return
 	}
 	if err := a.PtrToQueries.DeleteUsers(req.Context()); err != nil {
 		ErrorResponseWriter(writer, DatabaseError)
+		return
 	}
 }
 
-func (a *APIConfig) NewUser(writer http.ResponseWriter, req *http.Request) {
+func (a *APIConfig) PostUsers(writer http.ResponseWriter, req *http.Request) {
 	type requestBody struct {
 		Email string `json:"email"`
 	}
@@ -84,6 +86,7 @@ func (a *APIConfig) NewUser(writer http.ResponseWriter, req *http.Request) {
 	userCreationDetails, err := a.PtrToQueries.CreateUser(req.Context(), dataReceived.Email)
 	if err != nil {
 		ErrorResponseWriter(writer, DatabaseError)
+		return
 	}
 	formattedUserCreationDetails := validResponse{
 		ID: userCreationDetails.ID,
@@ -103,7 +106,7 @@ func (a *APIConfig) NewUser(writer http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (a *APIConfig) NewChirp(writer http.ResponseWriter, req *http.Request) {
+func (a *APIConfig) PostChirps(writer http.ResponseWriter, req *http.Request) {
 	type requestBody struct {
 		Body string `json:"body"`
 		UserID uuid.UUID `json:"user_id"`
@@ -168,7 +171,7 @@ func (a *APIConfig) NewChirp(writer http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (a *APIConfig) AllChirps(writer http.ResponseWriter, req *http.Request) {
+func (a *APIConfig) GetChirps(writer http.ResponseWriter, req *http.Request) {
 	type oneChirp struct {
 		ID uuid.UUID `json:"id"`
 		Body string `json:"body"`
@@ -180,6 +183,7 @@ func (a *APIConfig) AllChirps(writer http.ResponseWriter, req *http.Request) {
 	sliceOfAllChirps, err := a.PtrToQueries.GetAllChirps(req.Context())
 	if err != nil {
 		ErrorResponseWriter(writer, DatabaseError)
+		return
 	}
 	var sliceOfFormattedChirps []oneChirp
 	for _, chirp := range sliceOfAllChirps {
@@ -200,6 +204,49 @@ func (a *APIConfig) AllChirps(writer http.ResponseWriter, req *http.Request) {
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusOK)
 	if _, err := writer.Write(allChirpsInBytes); err != nil {
+		log.Println(err)
+	}
+}
+
+func (a *APIConfig) GetChirp(writer http.ResponseWriter, req *http.Request) {
+	type validResponse struct {
+		ID uuid.UUID `json:"id"`
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
+		Body string `json:"body"`
+		UserID uuid.UUID `json:"user_id"`
+	}
+
+	chirpID := req.PathValue("chirpID")
+	if chirpID == "" {
+		ErrorResponseWriter(writer, NotFound)
+		return
+	}
+	castedChirpID, err := uuid.Parse(chirpID)
+	if err != nil {
+		ErrorResponseWriter(writer, NotFound)
+		return
+	}
+	chirpToGet, err := a.PtrToQueries.GetOneChirp(req.Context(), castedChirpID)
+	if err != nil {
+		ErrorResponseWriter(writer, NotFound)
+		return
+	}
+
+	formattedChirpToGet := validResponse{
+		ID: chirpToGet.ID,
+		CreatedAt: chirpToGet.CreatedAt,
+		UpdatedAt: chirpToGet.UpdatedAt,
+		Body: chirpToGet.Body,
+		UserID: chirpToGet.UserID,
+	}
+	chirpToGetInBytes, err := json.Marshal(formattedChirpToGet)
+	if err != nil {
+		log.Println(err)
+	}
+	writer.Header().Set("Content-Type", "application/json")
+	writer.WriteHeader(http.StatusOK)
+	if _, err := writer.Write(chirpToGetInBytes); err != nil {
 		log.Println(err)
 	}
 }
