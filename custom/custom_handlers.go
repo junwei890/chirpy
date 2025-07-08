@@ -37,14 +37,14 @@ func ValidateChirp(writer http.ResponseWriter, req *http.Request) {
 		badRequestResponse := responseError{
 			Error: "Something went wrong",
 		}
-		badRequestResponseJSON, err := json.Marshal(badRequestResponse)
+		badRequestResponseInBytes, err := json.Marshal(badRequestResponse)
 		if err != nil {
 			log.Println(err)
 		}
 		
 		writer.Header().Set("Content-Type", "application/json")
 		writer.WriteHeader(http.StatusBadRequest)
-		if _, err := writer.Write(badRequestResponseJSON); err != nil {
+		if _, err := writer.Write(badRequestResponseInBytes); err != nil {
 			log.Println(err)
 		}
 		return
@@ -55,14 +55,14 @@ func ValidateChirp(writer http.ResponseWriter, req *http.Request) {
 		badRequestResponse := responseError{
 			Error: "Chirp is too long",
 		}
-		badRequestResponseJSON, err := json.Marshal(badRequestResponse)
+		badRequestResponseInBytes, err := json.Marshal(badRequestResponse)
 		if err != nil {
 			log.Println(err)
 		}
 
 		writer.Header().Set("Content-Type", "application/json")
 		writer.WriteHeader(http.StatusBadRequest)
-		if _, err := writer.Write(badRequestResponseJSON); err != nil {
+		if _, err := writer.Write(badRequestResponseInBytes); err != nil {
 			log.Println(err)
 		}
 		return
@@ -79,13 +79,13 @@ func ValidateChirp(writer http.ResponseWriter, req *http.Request) {
 	responseBody := &validResponse{
 		CleanedBody: cleanedChirp,
 	}
-	responseBodyJSON, err := json.Marshal(responseBody)
+	responseBodyInBytes, err := json.Marshal(responseBody)
 	if err != nil {
 		log.Println(err)
 	}
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusOK)
-	if _, err := writer.Write(responseBodyJSON); err != nil {
+	if _, err := writer.Write(responseBodyInBytes); err != nil {
 		log.Println(err)
 	}
 }
