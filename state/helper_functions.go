@@ -12,7 +12,9 @@ const (
 	ServiceError
 	BadRequest
 	NotFound
-	Unauthorized
+	UnauthorizedLogin
+	UnauthorizedBadJWT
+	UnauthorizedBadRT
 	Forbidden
 	LongChirp
 )
@@ -34,8 +36,14 @@ func ErrorResponseWriter(writer http.ResponseWriter, error Error) {
 	case NotFound:
 		errorMessage = "Not Found, try again"
 		statusCode = http.StatusNotFound
-	case Unauthorized:
+	case UnauthorizedLogin:
 		errorMessage = "Incorrect email or password"
+		statusCode = http.StatusUnauthorized
+	case UnauthorizedBadJWT:
+		errorMessage = "Invalid JWT"
+		statusCode = http.StatusUnauthorized
+	case UnauthorizedBadRT:
+		errorMessage = "Invalid Refresh token"
 		statusCode = http.StatusUnauthorized
 	case Forbidden:
 		errorMessage = "You're not allowed to use this endpoint"

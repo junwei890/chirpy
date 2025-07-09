@@ -144,12 +144,13 @@ func (a *APIConfig) PostChirps(writer http.ResponseWriter, req *http.Request) {
 
 	bearerToken, err := auth.GetBearerToken(req.Header)
 	if err != nil {
-		ErrorResponseWriter(writer, Unauthorized)
+		ErrorResponseWriter(writer, UnauthorizedBadJWT)
 		return
 	}
 	userID, err := auth.ValidateJWT(bearerToken, a.SecretKey)
 	if err != nil {
-		ErrorResponseWriter(writer, Unauthorized)
+		ErrorResponseWriter(writer, UnauthorizedBadJWT)
+		return
 	}
 
 	if len(dataReceived.Body) > 140 {
@@ -279,7 +280,6 @@ func (a *APIConfig) PostLogin(writer http.ResponseWriter, req *http.Request) {
 	type requestBody struct {
 		Password string `json:"password"`
 		Email string `json:"email"`
-		ExpiresIn int `json:"expires_in_seconds"`
 	}
 	type validResponse struct {
 		ID uuid.UUID `json:"id"`
@@ -287,6 +287,7 @@ func (a *APIConfig) PostLogin(writer http.ResponseWriter, req *http.Request) {
 		UpdatedAt time.Time `json:"updated_at"`
 		Email string `json:"email"`
 		Token string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
 	}
 
 	dataReceivedInBytes, err := io.ReadAll(req.Body)
@@ -302,22 +303,28 @@ func (a *APIConfig) PostLogin(writer http.ResponseWriter, req *http.Request) {
 
 	userDetails, err := a.PtrToQueries.GetUserByEmail(req.Context(), dataReceived.Email)
 	if err != nil {
-		ErrorResponseWriter(writer, Unauthorized)
+		ErrorResponseWriter(writer, UnauthorizedLogin)
 		return
 	}
 	if err := auth.CheckPasswordHash(userDetails.HashedPassword, dataReceived.Password); err != nil {
-		ErrorResponseWriter(writer, Unauthorized)
+		ErrorResponseWriter(writer, UnauthorizedLogin)
 		return
 	}
 
-	if dataReceived.ExpiresIn == 0 {
-		dataReceived.ExpiresIn = 3600
-	} else if dataReceived.ExpiresIn > 3600 {
-		dataReceived.ExpiresIn = 3600
-	}
-	token, err := auth.MakeJWT(userDetails.ID, a.SecretKey, time.Duration(dataReceived.ExpiresIn) * time.Second)
+	jwtToken, err := auth.MakeJWT(userDetails.ID, a.SecretKey, time.Duration(3600) * time.Second)
 	if err != nil {
 		ErrorResponseWriter(writer, ServiceError)
+		return
+	}
+
+	refreshToken, _ := auth.MakeRefreshToken()
+	createRefreshTokenParams := database.CreateRefreshTokenParams{
+		Token: refreshToken,
+		UserID: userDetails.ID,
+	}
+	createdRefreshToken, err := a.PtrToQueries.CreateRefreshToken(req.Context(), createRefreshTokenParams)
+	if err != nil {
+		ErrorResponseWriter(writer, DatabaseError)
 		return
 	}
 
@@ -326,7 +333,8 @@ func (a *APIConfig) PostLogin(writer http.ResponseWriter, req *http.Request) {
 		CreatedAt: userDetails.CreatedAt,
 		UpdatedAt: userDetails.UpdatedAt,
 		Email: userDetails.Email,
-		Token: token,
+		Token: jwtToken,
+		RefreshToken: createdRefreshToken.Token,
 	}
 	userDetailsInBytes, err := json.Marshal(formattedUserDetails)
 	if err != nil {
@@ -338,4 +346,59 @@ func (a *APIConfig) PostLogin(writer http.ResponseWriter, req *http.Request) {
 	if _, err := writer.Write(userDetailsInBytes); err != nil {
 		ErrorResponseWriter(writer, ServiceError)
 	}
+}
+
+func (a *APIConfig) PostRefresh(writer http.ResponseWriter, req *http.Request) {
+	type validResponse struct {
+		JWTToken string `json:"token"`
+	}
+
+	refreshToken, err := auth.GetBearerToken(req.Header)
+	if err != nil {
+		ErrorResponseWriter(writer, UnauthorizedBadRT)
+		return
+	}
+	refreshTokenDetails, err := a.PtrToQueries.GetToken(req.Context(), refreshToken)
+	if err != nil {
+		ErrorResponseWriter(writer, UnauthorizedBadRT)
+		return
+	}
+	if time.Now().After(refreshTokenDetails.ExpiresAt) {
+		ErrorResponseWriter(writer, UnauthorizedBadRT)
+		return
+	}
+
+	createdJWTToken, err := auth.MakeJWT(refreshTokenDetails.UserID, a.SecretKey, time.Duration(3600) * time.Second)
+	if err != nil {
+		ErrorResponseWriter(writer, ServiceError)
+		return
+	}
+
+	tokenResponse := validResponse{
+		JWTToken: createdJWTToken,
+	}
+	tokenResponseInBytes, err := json.Marshal(tokenResponse)
+	if err != nil {
+		ErrorResponseWriter(writer, ServiceError)
+		return
+	}
+	writer.Header().Set("Content-Type", "application/json")
+	writer.WriteHeader(http.StatusOK)
+	if _, err := writer.Write(tokenResponseInBytes); err != nil {
+		ErrorResponseWriter(writer, ServiceError)
+	}
+}
+
+func (a *APIConfig) PostRevoke(writer http.ResponseWriter, req *http.Request) {
+	refreshToken, err := auth.GetBearerToken(req.Header)
+	if err != nil {
+		ErrorResponseWriter(writer, UnauthorizedBadRT)
+		return
+	}
+	if err := a.PtrToQueries.RevokeToken(req.Context(), refreshToken); err != nil {
+		ErrorResponseWriter(writer, UnauthorizedBadRT)
+		return
+	}
+
+	writer.WriteHeader(http.StatusNoContent)
 }

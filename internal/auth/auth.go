@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"errors"
 	"strings"
+	"crypto/rand"
+	"encoding/hex"
 	"golang.org/x/crypto/bcrypt"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -81,4 +83,11 @@ func GetBearerToken(headers http.Header) (string, error) {
 		return "", errors.New("token not present in authorization header")
 	}
 	return authInfoSlice[1], nil
+}
+
+func MakeRefreshToken() (string, error) {
+	sliceToRead := make([]byte, 32)
+	rand.Read(sliceToRead)
+	bitEncodedString := hex.EncodeToString(sliceToRead)
+	return bitEncodedString, nil
 }
