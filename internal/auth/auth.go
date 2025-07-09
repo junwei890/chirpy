@@ -1,9 +1,10 @@
-package authentication
+package auth
 
 import (
 	"time"
-	"github.com/golang-jwt/jwt/v5"
+	"net/http"
 	"golang.org/x/crypto/bcrypt"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
 
@@ -54,4 +55,8 @@ func ValidateJWT(tokenString, secretKey string) (uuid.UUID, error) {
 		return uuid.UUID{}, err
 	}
 	return returnUUID, nil
+}
+
+func GetBearerToken(headers http.Header) (string, error) {
+	
 }

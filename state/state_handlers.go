@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"strings"
 	"github.com/junwei890/chirpy/internal/database"
-	"github.com/junwei890/chirpy/internal/authentication"
+	"github.com/junwei890/chirpy/internal/auth"
 	"github.com/google/uuid"
 )
 
@@ -84,7 +84,7 @@ func (a *APIConfig) PostUsers(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	hashedPassword, err := authentication.HashPassword(dataReceived.Password)
+	hashedPassword, err := auth.HashPassword(dataReceived.Password)
 	if err != nil {
 		ErrorResponseWriter(writer, ServiceError)
 		return
@@ -295,7 +295,7 @@ func (a *APIConfig) PostLogin(writer http.ResponseWriter, req *http.Request) {
 		ErrorResponseWriter(writer, Unauthorized)
 		return
 	}
-	if err := authentication.CheckPasswordHash(userDetails.HashedPassword, dataReceived.Password); err != nil {
+	if err := auth.CheckPasswordHash(userDetails.HashedPassword, dataReceived.Password); err != nil {
 		ErrorResponseWriter(writer, Unauthorized)
 		return
 	}
