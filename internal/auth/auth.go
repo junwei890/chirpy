@@ -3,6 +3,8 @@ package auth
 import (
 	"time"
 	"net/http"
+	"errors"
+	"strings"
 	"golang.org/x/crypto/bcrypt"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -16,7 +18,7 @@ func HashPassword(password string) (string, error) {
 	return string(hashedPasswordInBytes), nil
 }
 
-func CheckPasswordHash(password, hash string) error {
+func CheckPasswordHash(hash, password string) error {
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
 		return err
 	}
@@ -26,9 +28,9 @@ func CheckPasswordHash(password, hash string) error {
 func MakeJWT(userID uuid.UUID, secretKey string, expiresIn time.Duration) (string, error) {
 	claims := jwt.RegisteredClaims{
 		Issuer: "chirpy",
-		Subject: userID.String(),
 		IssuedAt: jwt.NewNumericDate(time.Now().UTC()),
 		ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(expiresIn)),
+		Subject: userID.String(),
 	}
 	createdToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signedToken, err := createdToken.SignedString([]byte(secretKey))
@@ -46,17 +48,37 @@ func ValidateJWT(tokenString, secretKey string) (uuid.UUID, error) {
 	if err != nil {
 		return uuid.UUID{}, err
 	}
-	stringifiedUUID, err := token.Claims.GetSubject()
+
+	jwtUUID, err := token.Claims.GetSubject()
 	if err != nil {
 		return uuid.UUID{}, err
 	}
-	returnUUID ,err := uuid.Parse(stringifiedUUID)
+
+	jwtIssuer, err := token.Claims.GetIssuer()
 	if err != nil {
 		return uuid.UUID{}, err
+	}
+
+	if jwtIssuer != "chirpy" {
+		return uuid.UUID{}, jwt.ErrTokenInvalidIssuer
+	}
+
+	returnUUID, err := uuid.Parse(jwtUUID)
+	if err != nil {
+		return uuid.UUID{}, jwt.ErrTokenInvalidSubject
 	}
 	return returnUUID, nil
 }
 
 func GetBearerToken(headers http.Header) (string, error) {
-	
+	authInfo := headers.Get("Authorization")
+	if authInfo == "" {
+		return "", errors.New("authorization header does not exist")
+	}
+
+	authInfoSlice := strings.Fields(authInfo)
+	if len(authInfoSlice) < 2 {
+		return "", errors.New("token not present in authorization header")
+	}
+	return authInfoSlice[1], nil
 }

@@ -17,6 +17,7 @@ type APIConfig struct {
 	FileServerHits atomic.Int32
 	PtrToQueries *database.Queries
 	Platform string
+	SecretKey string
 	Profanities map[string]struct{}
 }
 
@@ -121,7 +122,6 @@ func (a *APIConfig) PostUsers(writer http.ResponseWriter, req *http.Request) {
 func (a *APIConfig) PostChirps(writer http.ResponseWriter, req *http.Request) {
 	type requestBody struct {
 		Body string `json:"body"`
-		UserID uuid.UUID `json:"user_id"`
 	}
 	type validResponse struct {
 		ID uuid.UUID `json:"id"`
@@ -142,12 +142,20 @@ func (a *APIConfig) PostChirps(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	bearerToken, err := auth.GetBearerToken(req.Header)
+	if err != nil {
+		ErrorResponseWriter(writer, Unauthorized)
+		return
+	}
+	userID, err := auth.ValidateJWT(bearerToken, a.SecretKey)
+	if err != nil {
+		ErrorResponseWriter(writer, Unauthorized)
+	}
+
 	if len(dataReceived.Body) > 140 {
 		ErrorResponseWriter(writer, LongChirp)
 		return
 	}
-
-
 	chirpInSlice := strings.Split(dataReceived.Body, " ")
 	for index, word := range chirpInSlice {
 		if _, ok := a.Profanities[word]; ok {
@@ -158,7 +166,7 @@ func (a *APIConfig) PostChirps(writer http.ResponseWriter, req *http.Request) {
 
 	createChirpParams := database.CreateChirpParams{
 		Body: chirp,
-		UserID: dataReceived.UserID,
+		UserID: userID,
 	}
 	createdChirp, err := a.PtrToQueries.CreateChirp(req.Context(), createChirpParams)
 	if err != nil {
@@ -271,12 +279,14 @@ func (a *APIConfig) PostLogin(writer http.ResponseWriter, req *http.Request) {
 	type requestBody struct {
 		Password string `json:"password"`
 		Email string `json:"email"`
+		ExpiresIn int `json:"expires_in_seconds"`
 	}
 	type validResponse struct {
 		ID uuid.UUID `json:"id"`
 		CreatedAt time.Time `json:"created_at"`
 		UpdatedAt time.Time `json:"updated_at"`
 		Email string `json:"email"`
+		Token string `json:"token"`
 	}
 
 	dataReceivedInBytes, err := io.ReadAll(req.Body)
@@ -300,11 +310,23 @@ func (a *APIConfig) PostLogin(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if dataReceived.ExpiresIn == 0 {
+		dataReceived.ExpiresIn = 3600
+	} else if dataReceived.ExpiresIn > 3600 {
+		dataReceived.ExpiresIn = 3600
+	}
+	token, err := auth.MakeJWT(userDetails.ID, a.SecretKey, time.Duration(dataReceived.ExpiresIn) * time.Second)
+	if err != nil {
+		ErrorResponseWriter(writer, ServiceError)
+		return
+	}
+
 	formattedUserDetails := validResponse{
 		ID: userDetails.ID,
 		CreatedAt: userDetails.CreatedAt,
 		UpdatedAt: userDetails.UpdatedAt,
 		Email: userDetails.Email,
+		Token: token,
 	}
 	userDetailsInBytes, err := json.Marshal(formattedUserDetails)
 	if err != nil {

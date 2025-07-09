@@ -22,9 +22,12 @@ func main() {
 
 	platform := os.Getenv("PLATFORM")
 
+	secretKey := os.Getenv("SECRET_KEY")
+
 	ptrToAppState := &state.APIConfig{
 		PtrToQueries: dbQueries,
 		Platform: platform,
+		SecretKey: secretKey,
 		Profanities: map[string]struct{}{
 			"kerfuffle": {},
 			"sharbert": {},
