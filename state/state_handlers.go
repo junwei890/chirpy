@@ -4,12 +4,12 @@ import (
 	"sync/atomic"
 	"net/http"
 	"fmt"
-	"log"
 	"io"
 	"time"
 	"encoding/json"
 	"strings"
 	"github.com/junwei890/chirpy/internal/database"
+	"github.com/junwei890/chirpy/internal/authentication"
 	"github.com/google/uuid"
 )
 
@@ -25,7 +25,7 @@ func GetReadiness(writer http.ResponseWriter, req *http.Request) {
 	writer.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	writer.WriteHeader(http.StatusOK)
 	if _, err := writer.Write([]byte(http.StatusText(http.StatusOK))); err != nil {
-		log.Println(err)
+		ErrorResponseWriter(writer, ServiceError)
 	}
 }
 
@@ -45,7 +45,7 @@ func (a *APIConfig) GetMetrics(writer http.ResponseWriter, req *http.Request) {
   </body>
 </html>`, a.FileServerHits.Load())
 	if _, err := writer.Write([]byte(serverHits)); err != nil {
-		log.Println(err)
+		ErrorResponseWriter(writer, ServiceError)
 	}
 }
 
@@ -57,13 +57,13 @@ func (a *APIConfig) PostMetrics(writer http.ResponseWriter, req *http.Request) {
 	}
 	if err := a.PtrToQueries.DeleteUsers(req.Context()); err != nil {
 		ErrorResponseWriter(writer, DatabaseError)
-		return
 	}
 }
 
 func (a *APIConfig) PostUsers(writer http.ResponseWriter, req *http.Request) {
 	type requestBody struct {
 		Email string `json:"email"`
+		Password string `json:"password"`
 	}
 
 	type validResponse struct {
@@ -75,7 +75,8 @@ func (a *APIConfig) PostUsers(writer http.ResponseWriter, req *http.Request) {
 	
 	dataReceivedInBytes, err := io.ReadAll(req.Body)
 	if err != nil {
-		log.Println(err)
+		ErrorResponseWriter(writer, ServiceError)
+		return
 	}
 	dataReceived := &requestBody{}
 	if err := json.Unmarshal(dataReceivedInBytes, dataReceived); err != nil {
@@ -83,7 +84,17 @@ func (a *APIConfig) PostUsers(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	userCreationDetails, err := a.PtrToQueries.CreateUser(req.Context(), dataReceived.Email)
+	hashedPassword, err := authentication.HashPassword(dataReceived.Password)
+	if err != nil {
+		ErrorResponseWriter(writer, ServiceError)
+		return
+	}
+
+	createUserParams := database.CreateUserParams{
+		Email: dataReceived.Email,
+		HashedPassword: hashedPassword,
+	}
+	userCreationDetails, err := a.PtrToQueries.CreateUser(req.Context(), createUserParams)
 	if err != nil {
 		ErrorResponseWriter(writer, DatabaseError)
 		return
@@ -97,12 +108,13 @@ func (a *APIConfig) PostUsers(writer http.ResponseWriter, req *http.Request) {
 
 	userCreationDetailsInBytes, err := json.Marshal(formattedUserCreationDetails)
 	if err != nil {
-		log.Println(err)
+		ErrorResponseWriter(writer, ServiceError)
+		return
 	}
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusCreated)
 	if _, err := writer.Write(userCreationDetailsInBytes); err != nil {
-		log.Println(err)
+		ErrorResponseWriter(writer, ServiceError)
 	}
 }
 
@@ -121,7 +133,8 @@ func (a *APIConfig) PostChirps(writer http.ResponseWriter, req *http.Request) {
 
 	dataReceivedInBytes, err := io.ReadAll(req.Body)
 	if err != nil {
-		log.Println(err)
+		ErrorResponseWriter(writer, ServiceError)
+		return
 	}
 	dataReceived := &requestBody{}
 	if err := json.Unmarshal(dataReceivedInBytes, dataReceived); err != nil {
@@ -162,12 +175,13 @@ func (a *APIConfig) PostChirps(writer http.ResponseWriter, req *http.Request) {
 
 	chirpCreationDetailsInBytes, err := json.Marshal(formattedChirpCreationDetails)
 	if err != nil {
-		log.Println(err)
+		ErrorResponseWriter(writer, ServiceError)
+		return
 	}
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusCreated)
 	if _, err := writer.Write(chirpCreationDetailsInBytes); err != nil {
-		log.Println(err)
+		ErrorResponseWriter(writer, ServiceError)
 	}
 }
 
@@ -199,12 +213,13 @@ func (a *APIConfig) GetChirps(writer http.ResponseWriter, req *http.Request) {
 	
 	allChirpsInBytes, err := json.Marshal(sliceOfFormattedChirps)
 	if err != nil {
-		log.Println(err)
+		ErrorResponseWriter(writer, ServiceError)
+		return
 	}
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusOK)
 	if _, err := writer.Write(allChirpsInBytes); err != nil {
-		log.Println(err)
+		ErrorResponseWriter(writer, ServiceError)
 	}
 }
 
@@ -242,11 +257,63 @@ func (a *APIConfig) GetChirp(writer http.ResponseWriter, req *http.Request) {
 	}
 	chirpToGetInBytes, err := json.Marshal(formattedChirpToGet)
 	if err != nil {
-		log.Println(err)
+		ErrorResponseWriter(writer, ServiceError)
+		return
 	}
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusOK)
 	if _, err := writer.Write(chirpToGetInBytes); err != nil {
-		log.Println(err)
+		ErrorResponseWriter(writer, ServiceError)
+	}
+}
+
+func (a *APIConfig) PostLogin(writer http.ResponseWriter, req *http.Request) {
+	type requestBody struct {
+		Password string `json:"password"`
+		Email string `json:"email"`
+	}
+	type validResponse struct {
+		ID uuid.UUID `json:"id"`
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
+		Email string `json:"email"`
+	}
+
+	dataReceivedInBytes, err := io.ReadAll(req.Body)
+	if err != nil {
+		ErrorResponseWriter(writer, ServiceError)
+		return
+	}
+	dataReceived := &requestBody{}
+	if err := json.Unmarshal(dataReceivedInBytes, dataReceived); err != nil {
+		ErrorResponseWriter(writer, BadRequest)
+		return
+	}
+
+	userDetails, err := a.PtrToQueries.GetUserByEmail(req.Context(), dataReceived.Email)
+	if err != nil {
+		ErrorResponseWriter(writer, Unauthorized)
+		return
+	}
+	if err := authentication.CheckPasswordHash(userDetails.HashedPassword, dataReceived.Password); err != nil {
+		ErrorResponseWriter(writer, Unauthorized)
+		return
+	}
+
+	formattedUserDetails := validResponse{
+		ID: userDetails.ID,
+		CreatedAt: userDetails.CreatedAt,
+		UpdatedAt: userDetails.UpdatedAt,
+		Email: userDetails.Email,
+	}
+	userDetailsInBytes, err := json.Marshal(formattedUserDetails)
+	if err != nil {
+		ErrorResponseWriter(writer, ServiceError)
+		return
+	}
+	writer.Header().Set("Content-Type", "application/json")
+	writer.WriteHeader(http.StatusOK)
+	if _, err := writer.Write(userDetailsInBytes); err != nil {
+		ErrorResponseWriter(writer, ServiceError)
 	}
 }

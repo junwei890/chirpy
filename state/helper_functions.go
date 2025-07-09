@@ -9,8 +9,10 @@ import (
 type Error int
 const (
 	DatabaseError Error = iota
+	ServiceError
 	BadRequest
 	NotFound
+	Unauthorized
 	Forbidden
 	LongChirp
 )
@@ -23,8 +25,8 @@ func ErrorResponseWriter(writer http.ResponseWriter, error Error) {
 	var statusCode int
 
 	switch error {
-	case DatabaseError:
-		errorMessage = "Internal database error, try again"
+	case DatabaseError, ServiceError:
+		errorMessage = "Internal server error, try again"
 		statusCode = http.StatusInternalServerError
 	case BadRequest:
 		errorMessage = "Bad request, try again"
@@ -32,6 +34,9 @@ func ErrorResponseWriter(writer http.ResponseWriter, error Error) {
 	case NotFound:
 		errorMessage = "Not Found, try again"
 		statusCode = http.StatusNotFound
+	case Unauthorized:
+		errorMessage = "Incorrect email or password"
+		statusCode = http.StatusUnauthorized
 	case Forbidden:
 		errorMessage = "You're not allowed to use this endpoint"
 		statusCode = http.StatusForbidden

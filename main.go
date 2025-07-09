@@ -41,6 +41,7 @@ func main() {
 	const getMetrics = "GET /admin/metrics"
 	const postMetrics = "POST /admin/reset"
 	const postUsers = "POST /api/users"
+	const postLogin = "POST /api/login"
 	const postChirps = "POST /api/chirps"
 	const getChirps = "GET /api/chirps"
 	const getChirp = "GET /api/chirps/{chirpID}"
@@ -64,6 +65,7 @@ func main() {
 
 	// User related
 	requestMultiplexer.HandleFunc(postUsers, ptrToAppState.PostUsers)
+	requestMultiplexer.HandleFunc(postLogin, ptrToAppState.PostLogin)
 
 	server := &http.Server{
 		Addr: port,
