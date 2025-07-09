@@ -61,7 +61,7 @@ func TestMakingAndValidatingJWT(t *testing.T) {
 		errorPresent bool
 	}{
 		{
-			name: "Token is valid",
+			name: "Token is valid and returned UUID is the same",
 			userID: userID1,
 			jwtToken: jwtTokenUserID1,
 			secretKey: secretKey1,
@@ -85,9 +85,12 @@ func TestMakingAndValidatingJWT(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			_, err := authentication.ValidateJWT(testCase.jwtToken, testCase.secretKey)
+			returnedUserID, err := authentication.ValidateJWT(testCase.jwtToken, testCase.secretKey)
 			if (err != nil) != testCase.errorPresent {
 				t.Errorf("Test case: %s, failed.", testCase.name)
+			}
+			if testCase.name == "Token is valid and returned UUID is the same" && testCase.userID != returnedUserID {
+				t.Errorf("Test case: %s, failed. %v != %v", testCase.name, testCase.userID, returnedUserID)
 			}
 		})
 	}
