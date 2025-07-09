@@ -4,14 +4,14 @@ import (
 	"testing"
 	"time"
 	"github.com/google/uuid"
-	"github.com/junwei890/chirpy/internal/authentication"
+	"github.com/junwei890/chirpy/internal/auth"
 )
 
 func TestHashPassword(t *testing.T) {
 	password1 := "helloworld"
 	password2 := "blazinglyfast"
-	hashedPassword1, _ := authentication.HashPassword(password1)
-	hashedPassword2, _ := authentication.HashPassword(password2)
+	hashedPassword1, _ := auth.HashPassword(password1)
+	hashedPassword2, _ := auth.HashPassword(password2)
 
 	testCases := []struct {
 		name string
@@ -35,7 +35,7 @@ func TestHashPassword(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			err := authentication.CheckPasswordHash(testCase.password, testCase.hash)
+			err := auth.CheckPasswordHash(testCase.password, testCase.hash)
 			if (err != nil) != testCase.errorPresent {
 				t.Errorf("Test case: %s, failed.", testCase.name)
 			}
@@ -50,8 +50,8 @@ func TestMakingAndValidatingJWT(t *testing.T) {
 	secretKey2 := "blazinglyfast"
 	duration1 := time.Duration(60000000000)
 	duration2 := time.Duration(60)
-	jwtTokenUserID1, _ := authentication.MakeJWT(userID1, secretKey1, duration1)
-	jwtTokenUserID2, _ := authentication.MakeJWT(userID2, secretKey2, duration2)
+	jwtTokenUserID1, _ := auth.MakeJWT(userID1, secretKey1, duration1)
+	jwtTokenUserID2, _ := auth.MakeJWT(userID2, secretKey2, duration2)
 
 	testCases := []struct {
 		name string
@@ -85,7 +85,7 @@ func TestMakingAndValidatingJWT(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			returnedUserID, err := authentication.ValidateJWT(testCase.jwtToken, testCase.secretKey)
+			returnedUserID, err := auth.ValidateJWT(testCase.jwtToken, testCase.secretKey)
 			if (err != nil) != testCase.errorPresent {
 				t.Errorf("Test case: %s, failed.", testCase.name)
 			}
