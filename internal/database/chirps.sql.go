@@ -7,19 +7,24 @@ package database
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
 
 const createChirp = `-- name: CreateChirp :one
-INSERT INTO chirps (id, body, user_id, created_at, updated_at)
-VALUES (
-	GEN_RANDOM_UUID(),
-	$1,
-	$2,
-	NOW(),
-	NOW()
-) RETURNING id, body, user_id, created_at, updated_at
+WITH chirpinsert AS (
+	INSERT INTO chirps (id, body, user_id, created_at, updated_at)
+	VALUES (
+		GEN_RANDOM_UUID(),
+		$1,
+		$2,
+		NOW(),
+		NOW()
+	) RETURNING id, body, user_id, created_at, updated_at
+)
+SELECT chirpinsert.id, chirpinsert.body, chirpinsert.user_id, chirpinsert.created_at, chirpinsert.updated_at, users.is_chirpy_red FROM chirpinsert
+INNER JOIN users ON chirpinsert.user_id = users.id
 `
 
 type CreateChirpParams struct {
@@ -27,15 +32,25 @@ type CreateChirpParams struct {
 	UserID uuid.UUID
 }
 
-func (q *Queries) CreateChirp(ctx context.Context, arg CreateChirpParams) (Chirp, error) {
+type CreateChirpRow struct {
+	ID          uuid.UUID
+	Body        string
+	UserID      uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	IsChirpyRed bool
+}
+
+func (q *Queries) CreateChirp(ctx context.Context, arg CreateChirpParams) (CreateChirpRow, error) {
 	row := q.db.QueryRowContext(ctx, createChirp, arg.Body, arg.UserID)
-	var i Chirp
+	var i CreateChirpRow
 	err := row.Scan(
 		&i.ID,
 		&i.Body,
 		&i.UserID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsChirpyRed,
 	)
 	return i, err
 }
@@ -50,24 +65,36 @@ func (q *Queries) DeleteChirp(ctx context.Context, id uuid.UUID) error {
 }
 
 const getAllChirps = `-- name: GetAllChirps :many
-SELECT id, body, user_id, created_at, updated_at FROM chirps ORDER BY created_at ASC
+SELECT chirps.id, chirps.body, chirps.user_id, chirps.created_at, chirps.updated_at, users.is_chirpy_red FROM chirps
+INNER JOIN users ON chirps.user_id = users.id
+ORDER BY chirps.created_at ASC
 `
 
-func (q *Queries) GetAllChirps(ctx context.Context) ([]Chirp, error) {
+type GetAllChirpsRow struct {
+	ID          uuid.UUID
+	Body        string
+	UserID      uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	IsChirpyRed bool
+}
+
+func (q *Queries) GetAllChirps(ctx context.Context) ([]GetAllChirpsRow, error) {
 	rows, err := q.db.QueryContext(ctx, getAllChirps)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Chirp
+	var items []GetAllChirpsRow
 	for rows.Next() {
-		var i Chirp
+		var i GetAllChirpsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Body,
 			&i.UserID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.IsChirpyRed,
 		); err != nil {
 			return nil, err
 		}
@@ -83,18 +110,30 @@ func (q *Queries) GetAllChirps(ctx context.Context) ([]Chirp, error) {
 }
 
 const getOneChirp = `-- name: GetOneChirp :one
-SELECT id, body, user_id, created_at, updated_at FROM chirps WHERE id = $1
+SELECT chirps.id, chirps.body, chirps.user_id, chirps.created_at, chirps.updated_at, users.is_chirpy_red FROM chirps
+INNER JOIN users ON chirps.user_id = users.id
+WHERE chirps.id = $1
 `
 
-func (q *Queries) GetOneChirp(ctx context.Context, id uuid.UUID) (Chirp, error) {
+type GetOneChirpRow struct {
+	ID          uuid.UUID
+	Body        string
+	UserID      uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	IsChirpyRed bool
+}
+
+func (q *Queries) GetOneChirp(ctx context.Context, id uuid.UUID) (GetOneChirpRow, error) {
 	row := q.db.QueryRowContext(ctx, getOneChirp, id)
-	var i Chirp
+	var i GetOneChirpRow
 	err := row.Scan(
 		&i.ID,
 		&i.Body,
 		&i.UserID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsChirpyRed,
 	)
 	return i, err
 }

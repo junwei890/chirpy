@@ -49,9 +49,10 @@ func main() {
 	const postRefresh = "POST /api/refresh"
 	const postRevoke = "POST /api/revoke"
 	const postChirps = "POST /api/chirps"
-	const deleteChirp = "DELETE /api/chirps/{chirpID}"
+	const deleteChirps = "DELETE /api/chirps/{chirpID}"
 	const getChirps = "GET /api/chirps"
-	const getChirp = "GET /api/chirps/{chirpID}"
+	const getChirpsByID = "GET /api/chirps/{chirpID}"
+	const postRed = "POST /api/polka/webhooks"
 
 	requestMultiplexer := http.NewServeMux()
 	fileSystem := http.Dir(root)
@@ -67,9 +68,9 @@ func main() {
 
 	// Chirp related
 	requestMultiplexer.HandleFunc(postChirps, ptrToAppState.PostChirps)
-	requestMultiplexer.HandleFunc(deleteChirp, ptrToAppState.DeleteChirp)
+	requestMultiplexer.HandleFunc(deleteChirps, ptrToAppState.DeleteChirps)
 	requestMultiplexer.HandleFunc(getChirps, ptrToAppState.GetChirps)
-	requestMultiplexer.HandleFunc(getChirp, ptrToAppState.GetChirp)
+	requestMultiplexer.HandleFunc(getChirpsByID, ptrToAppState.GetChirpsByID)
 
 	// User related
 	requestMultiplexer.HandleFunc(postUsers, ptrToAppState.PostUsers)
@@ -77,6 +78,9 @@ func main() {
 	requestMultiplexer.HandleFunc(postLogin, ptrToAppState.PostLogin)
 	requestMultiplexer.HandleFunc(postRefresh, ptrToAppState.PostRefresh)
 	requestMultiplexer.HandleFunc(postRevoke, ptrToAppState.PostRevoke)
+
+	// Webhooks
+	requestMultiplexer.HandleFunc(postRed, ptrToAppState.PostRed)
 
 	server := &http.Server{
 		Addr: port,

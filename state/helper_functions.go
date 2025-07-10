@@ -12,6 +12,7 @@ const (
 	ServiceError
 	BadRequest
 	NotFound
+	NoContent
 	UnauthorizedLogin
 	UnauthorizedBadJWT
 	UnauthorizedBadRT
@@ -36,6 +37,9 @@ func ErrorResponseWriter(writer http.ResponseWriter, error Error) {
 	case NotFound:
 		errorMessage = "Not Found, try again"
 		statusCode = http.StatusNotFound
+	case NoContent:
+		errorMessage = "Event does not exist"
+		statusCode = http.StatusNoContent
 	case UnauthorizedLogin:
 		errorMessage = "Incorrect email or password"
 		statusCode = http.StatusUnauthorized

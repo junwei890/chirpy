@@ -72,6 +72,7 @@ func (a *APIConfig) PostUsers(writer http.ResponseWriter, req *http.Request) {
 		Email string `json:"email"`
 		CreatedAt time.Time `json:"created_at"`
 		UpdatedAt time.Time `json:"updated_at"`
+		ChirpyRed bool `json:"is_chirpy_red"`
 	}
 	
 	dataReceivedInBytes, err := io.ReadAll(req.Body)
@@ -105,6 +106,7 @@ func (a *APIConfig) PostUsers(writer http.ResponseWriter, req *http.Request) {
 		Email: dataReceived.Email,
 		CreatedAt: userCreationDetails.CreatedAt,
 		UpdatedAt: userCreationDetails.UpdatedAt,
+		ChirpyRed: userCreationDetails.IsChirpyRed,
 	}
 
 	userCreationDetailsInBytes, err := json.Marshal(formattedUserCreationDetails)
@@ -127,6 +129,7 @@ func (a *APIConfig) PostChirps(writer http.ResponseWriter, req *http.Request) {
 		ID uuid.UUID `json:"id"`
 		Body string `json:"body"`
 		UserID uuid.UUID `json:"user_id"`
+		ChirpyRed bool `json:"is_chirpy_red"`
 		CreatedAt time.Time `json:"created_at"`
 		UpdatedAt time.Time `json:"updated_at"`
 	}
@@ -178,6 +181,7 @@ func (a *APIConfig) PostChirps(writer http.ResponseWriter, req *http.Request) {
 		ID: createdChirp.ID,
 		Body: chirp,
 		UserID: createdChirp.UserID,
+		ChirpyRed: createdChirp.IsChirpyRed,
 		CreatedAt: createdChirp.CreatedAt,
 		UpdatedAt: createdChirp.UpdatedAt,
 	}
@@ -199,6 +203,7 @@ func (a *APIConfig) GetChirps(writer http.ResponseWriter, req *http.Request) {
 		ID uuid.UUID `json:"id"`
 		Body string `json:"body"`
 		UserID uuid.UUID `json:"user_id"`
+		ChirpyRed bool `json:"is_chirpy_red"`
 		CreatedAt time.Time `json:"created_at"`
 		UpdatedAt time.Time `json:"updated_at"`
 	}
@@ -214,6 +219,7 @@ func (a *APIConfig) GetChirps(writer http.ResponseWriter, req *http.Request) {
 			ID: chirp.ID,
 			Body: chirp.Body,
 			UserID: chirp.UserID,
+			ChirpyRed: chirp.IsChirpyRed,
 			CreatedAt: chirp.CreatedAt,
 			UpdatedAt: chirp.UpdatedAt,
 		}
@@ -232,13 +238,14 @@ func (a *APIConfig) GetChirps(writer http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (a *APIConfig) GetChirp(writer http.ResponseWriter, req *http.Request) {
+func (a *APIConfig) GetChirpsByID(writer http.ResponseWriter, req *http.Request) {
 	type validResponse struct {
 		ID uuid.UUID `json:"id"`
 		CreatedAt time.Time `json:"created_at"`
 		UpdatedAt time.Time `json:"updated_at"`
 		Body string `json:"body"`
 		UserID uuid.UUID `json:"user_id"`
+		ChirpyRed bool `json:"is_chirpy_red"`
 	}
 
 	chirpID := req.PathValue("chirpID")
@@ -263,6 +270,7 @@ func (a *APIConfig) GetChirp(writer http.ResponseWriter, req *http.Request) {
 		UpdatedAt: chirpToGet.UpdatedAt,
 		Body: chirpToGet.Body,
 		UserID: chirpToGet.UserID,
+		ChirpyRed: chirpToGet.IsChirpyRed,
 	}
 	chirpToGetInBytes, err := json.Marshal(formattedChirpToGet)
 	if err != nil {
@@ -286,6 +294,7 @@ func (a *APIConfig) PostLogin(writer http.ResponseWriter, req *http.Request) {
 		CreatedAt time.Time `json:"created_at"`
 		UpdatedAt time.Time `json:"updated_at"`
 		Email string `json:"email"`
+		ChirpyRed bool `json:"is_chirpy_red"`
 		Token string `json:"token"`
 		RefreshToken string `json:"refresh_token"`
 	}
@@ -333,6 +342,7 @@ func (a *APIConfig) PostLogin(writer http.ResponseWriter, req *http.Request) {
 		CreatedAt: userDetails.CreatedAt,
 		UpdatedAt: userDetails.UpdatedAt,
 		Email: userDetails.Email,
+		ChirpyRed: userDetails.IsChirpyRed,
 		Token: jwtToken,
 		RefreshToken: createdRefreshToken.Token,
 	}
@@ -413,6 +423,7 @@ func (a *APIConfig) PutUsers(writer http.ResponseWriter, req *http.Request) {
 		CreatedAt time.Time `json:"created_at"`
 		UpdatedAt time.Time `json:"updated_at"`
 		Email string `json:"email"`
+		ChirpyRed bool `json:"is_chirpy_red"`
 	}
 
 	jwtToken, err := auth.GetBearerToken(req.Header)
@@ -459,6 +470,7 @@ func (a *APIConfig) PutUsers(writer http.ResponseWriter, req *http.Request) {
 		CreatedAt: updatedUserDetails.CreatedAt,
 		UpdatedAt: updatedUserDetails.UpdatedAt,
 		Email: updatedUserDetails.Email,
+		ChirpyRed: updatedUserDetails.IsChirpyRed,
 	}
 	validResponseInBytes, err := json.Marshal(formattedValidResponse)
 	if err != nil {
@@ -472,7 +484,7 @@ func (a *APIConfig) PutUsers(writer http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (a *APIConfig) DeleteChirp(writer http.ResponseWriter, req *http.Request) {
+func (a *APIConfig) DeleteChirps(writer http.ResponseWriter, req *http.Request) {
 	jwtToken, err := auth.GetBearerToken(req.Header)
 	if err != nil {
 		ErrorResponseWriter(writer, UnauthorizedBadJWT)
@@ -509,5 +521,43 @@ func (a *APIConfig) DeleteChirp(writer http.ResponseWriter, req *http.Request) {
 		ErrorResponseWriter(writer, DatabaseError)
 		return
 	}
+	writer.WriteHeader(http.StatusNoContent)
+}
+
+func (a *APIConfig) PostRed(writer http.ResponseWriter, req *http.Request) {
+	type data struct {
+		UserID string `json:"user_id"`
+	}
+
+	type requestBody struct {
+		Event string `json:"event"`
+		Data data `json:"data"`
+	}
+
+	dataReceivedInBytes, err := io.ReadAll(req.Body)
+	if err != nil {
+		ErrorResponseWriter(writer, ServiceError)
+		return
+	}
+	dataReceived := &requestBody{}
+	if err := json.Unmarshal(dataReceivedInBytes, dataReceived); err != nil {
+		ErrorResponseWriter(writer, BadRequest)
+		return
+	}
+	if dataReceived.Event != "user.upgraded" {
+		ErrorResponseWriter(writer, NoContent)
+		return
+	}
+
+	parsedUserID, err := uuid.Parse(dataReceived.Data.UserID)
+	if err != nil {
+		ErrorResponseWriter(writer, ServiceError)
+		return
+	}
+	if err := a.PtrToQueries.UpdateRedUser(req.Context(), parsedUserID); err != nil {
+		ErrorResponseWriter(writer, NotFound)
+		return
+	}
+
 	writer.WriteHeader(http.StatusNoContent)
 }
