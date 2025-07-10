@@ -1,5 +1,5 @@
 # About
 
-Chirpy is just a learning project to get me familiarized with API and server building.
+Chirpy was a learning project to get me familiarized with API and server building. Very nice.
 
 ## Documentation
