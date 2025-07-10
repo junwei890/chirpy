@@ -49,6 +49,7 @@ func main() {
 	const postRefresh = "POST /api/refresh"
 	const postRevoke = "POST /api/revoke"
 	const postChirps = "POST /api/chirps"
+	const deleteChirp = "DELETE /api/chirps/{chirpID}"
 	const getChirps = "GET /api/chirps"
 	const getChirp = "GET /api/chirps/{chirpID}"
 
@@ -66,6 +67,7 @@ func main() {
 
 	// Chirp related
 	requestMultiplexer.HandleFunc(postChirps, ptrToAppState.PostChirps)
+	requestMultiplexer.HandleFunc(deleteChirp, ptrToAppState.DeleteChirp)
 	requestMultiplexer.HandleFunc(getChirps, ptrToAppState.GetChirps)
 	requestMultiplexer.HandleFunc(getChirp, ptrToAppState.GetChirp)
 

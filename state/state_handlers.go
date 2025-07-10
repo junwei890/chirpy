@@ -471,3 +471,43 @@ func (a *APIConfig) PutUsers(writer http.ResponseWriter, req *http.Request) {
 		ErrorResponseWriter(writer, ServiceError)
 	}
 }
+
+func (a *APIConfig) DeleteChirp(writer http.ResponseWriter, req *http.Request) {
+	jwtToken, err := auth.GetBearerToken(req.Header)
+	if err != nil {
+		ErrorResponseWriter(writer, UnauthorizedBadJWT)
+		return
+	}
+	userID, err := auth.ValidateJWT(jwtToken, a.SecretKey)
+	if err != nil {
+		ErrorResponseWriter(writer, UnauthorizedBadJWT)
+		return
+	}
+
+	chirpID := req.PathValue("chirpID")
+	if chirpID == "" {
+		ErrorResponseWriter(writer, NotFound)
+		return
+	}
+	parsedChirpID, err := uuid.Parse(chirpID)
+	if err != nil {
+		ErrorResponseWriter(writer, NotFound)
+		return
+	}
+
+	returnedChirp, err := a.PtrToQueries.GetOneChirp(req.Context(), parsedChirpID)
+	if err != nil {
+		ErrorResponseWriter(writer, NotFound)
+		return
+	}
+	if returnedChirp.UserID != userID {
+		ErrorResponseWriter(writer, Forbidden)
+		return
+	}
+
+	if err := a.PtrToQueries.DeleteChirp(req.Context(), returnedChirp.ID); err != nil {
+		ErrorResponseWriter(writer, DatabaseError)
+		return
+	}
+	writer.WriteHeader(http.StatusNoContent)
+}
