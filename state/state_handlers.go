@@ -8,6 +8,7 @@ import (
 	"time"
 	"encoding/json"
 	"strings"
+	"sort"
 	"github.com/junwei890/chirpy/internal/database"
 	"github.com/junwei890/chirpy/internal/auth"
 	"github.com/google/uuid"
@@ -212,6 +213,7 @@ func (a *APIConfig) GetChirps(writer http.ResponseWriter, req *http.Request) {
 		UpdatedAt time.Time `json:"updated_at"`
 	}
 
+	sortOrder := req.URL.Query().Get("sort")
 	authorID := req.URL.Query().Get("author_id")
 	parsedAuthorID, err := uuid.Parse(authorID)
 	if err != nil {
@@ -251,6 +253,13 @@ func (a *APIConfig) GetChirps(writer http.ResponseWriter, req *http.Request) {
 			returnChirps = append(returnChirps, formattedChirp)
 		}
 	}
+
+	if sortOrder == "desc" {
+		sort.Slice(returnChirps, func(i, j int) bool {
+			return returnChirps[i].CreatedAt.After(returnChirps[j].CreatedAt)
+		})
+	}
+
 	chirpsInBytes, err := json.Marshal(returnChirps)
 	if err != nil {
 		ErrorResponseWriter(writer, ServiceError)
