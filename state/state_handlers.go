@@ -21,7 +21,6 @@ type APIConfig struct {
 	WebhookKey string
 }
 
-
 func GetReadiness(writer http.ResponseWriter, req *http.Request) {
 	writer.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	writer.WriteHeader(http.StatusOK)
@@ -213,32 +212,53 @@ func (a *APIConfig) GetChirps(writer http.ResponseWriter, req *http.Request) {
 		UpdatedAt time.Time `json:"updated_at"`
 	}
 
+	authorID := req.URL.Query().Get("author_id")
+	parsedAuthorID, err := uuid.Parse(authorID)
+	if err != nil {
+		parsedAuthorID = uuid.Nil
+	}
+
 	sliceOfAllChirps, err := a.PtrToQueries.GetAllChirps(req.Context())
 	if err != nil {
 		ErrorResponseWriter(writer, DatabaseError)
 		return
 	}
-	var sliceOfFormattedChirps []oneChirp
-	for _, chirp := range sliceOfAllChirps {
-		formattedChirp := oneChirp{
-			ID: chirp.ID,
-			Body: chirp.Body,
-			UserID: chirp.UserID,
-			ChirpyRed: chirp.IsChirpyRed,
-			CreatedAt: chirp.CreatedAt,
-			UpdatedAt: chirp.UpdatedAt,
+	returnChirps := []oneChirp{}
+	if parsedAuthorID != uuid.Nil {
+		for _, chirp := range sliceOfAllChirps {
+			if parsedAuthorID == chirp.UserID {
+				formattedChirp := oneChirp{
+					ID: chirp.ID,
+					Body: chirp.Body,
+					UserID: chirp.UserID,
+					ChirpyRed: chirp.IsChirpyRed,
+					CreatedAt: chirp.CreatedAt,
+					UpdatedAt: chirp.UpdatedAt,
+				}
+				returnChirps = append(returnChirps, formattedChirp)
+			}
 		}
-		sliceOfFormattedChirps = append(sliceOfFormattedChirps, formattedChirp)
+	} else {	
+		for _, chirp := range sliceOfAllChirps {
+			formattedChirp := oneChirp{
+				ID: chirp.ID,
+				Body: chirp.Body,
+				UserID: chirp.UserID,
+				ChirpyRed: chirp.IsChirpyRed,
+				CreatedAt: chirp.CreatedAt,
+				UpdatedAt: chirp.UpdatedAt,
+			}
+			returnChirps = append(returnChirps, formattedChirp)
+		}
 	}
-	
-	allChirpsInBytes, err := json.Marshal(sliceOfFormattedChirps)
+	chirpsInBytes, err := json.Marshal(returnChirps)
 	if err != nil {
 		ErrorResponseWriter(writer, ServiceError)
 		return
 	}
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusOK)
-	if _, err := writer.Write(allChirpsInBytes); err != nil {
+	if _, err := writer.Write(chirpsInBytes); err != nil {
 		ErrorResponseWriter(writer, ServiceError)
 	}
 }
