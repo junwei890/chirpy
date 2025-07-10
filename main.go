@@ -24,15 +24,13 @@ func main() {
 
 	secretKey := os.Getenv("SECRET_KEY")
 
+	webhookKey := os.Getenv("POLKA_KEY")
+
 	ptrToAppState := &state.APIConfig{
 		PtrToQueries: dbQueries,
 		Platform: platform,
 		SecretKey: secretKey,
-		Profanities: map[string]struct{}{
-			"kerfuffle": {},
-			"sharbert": {},
-			"fornax": {},
-		},
+		WebhookKey: webhookKey,
 	}
 
 	const root = "."

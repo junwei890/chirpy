@@ -18,7 +18,7 @@ type APIConfig struct {
 	PtrToQueries *database.Queries
 	Platform string
 	SecretKey string
-	Profanities map[string]struct{}
+	WebhookKey string
 }
 
 
@@ -133,6 +133,11 @@ func (a *APIConfig) PostChirps(writer http.ResponseWriter, req *http.Request) {
 		CreatedAt time.Time `json:"created_at"`
 		UpdatedAt time.Time `json:"updated_at"`
 	}
+	profanities := map[string]struct{}{
+		"kerfuffle": {},
+		"sharbert": {},
+		"fornax": {},
+	}
 
 	dataReceivedInBytes, err := io.ReadAll(req.Body)
 	if err != nil {
@@ -162,7 +167,7 @@ func (a *APIConfig) PostChirps(writer http.ResponseWriter, req *http.Request) {
 	}
 	chirpInSlice := strings.Split(dataReceived.Body, " ")
 	for index, word := range chirpInSlice {
-		if _, ok := a.Profanities[word]; ok {
+		if _, ok := profanities[word]; ok {
 			chirpInSlice[index] = "****"
 		}
 	}
@@ -532,6 +537,16 @@ func (a *APIConfig) PostRed(writer http.ResponseWriter, req *http.Request) {
 	type requestBody struct {
 		Event string `json:"event"`
 		Data data `json:"data"`
+	}
+
+	apiKey, err := auth.GetAPIKey(req.Header)
+	if err != nil {
+		ErrorResponseWriter(writer, UnauthorizedBadAPIKey)
+		return
+	}
+	if apiKey != a.WebhookKey {
+		ErrorResponseWriter(writer, UnauthorizedBadAPIKey)
+		return
 	}
 
 	dataReceivedInBytes, err := io.ReadAll(req.Body)

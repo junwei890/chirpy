@@ -16,6 +16,7 @@ const (
 	UnauthorizedLogin
 	UnauthorizedBadJWT
 	UnauthorizedBadRT
+	UnauthorizedBadAPIKey
 	Forbidden
 	LongChirp
 )
@@ -48,6 +49,9 @@ func ErrorResponseWriter(writer http.ResponseWriter, error Error) {
 		statusCode = http.StatusUnauthorized
 	case UnauthorizedBadRT:
 		errorMessage = "Invalid Refresh token"
+		statusCode = http.StatusUnauthorized
+	case UnauthorizedBadAPIKey:
+		errorMessage = "Invalid API key"
 		statusCode = http.StatusUnauthorized
 	case Forbidden:
 		errorMessage = "You're not allowed to use this endpoint"
