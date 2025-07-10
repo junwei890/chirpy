@@ -44,6 +44,7 @@ func main() {
 	const getMetrics = "GET /admin/metrics"
 	const postMetrics = "POST /admin/reset"
 	const postUsers = "POST /api/users"
+	const putUsers = "PUT /api/users"
 	const postLogin = "POST /api/login"
 	const postRefresh = "POST /api/refresh"
 	const postRevoke = "POST /api/revoke"
@@ -70,6 +71,7 @@ func main() {
 
 	// User related
 	requestMultiplexer.HandleFunc(postUsers, ptrToAppState.PostUsers)
+	requestMultiplexer.HandleFunc(putUsers, ptrToAppState.PutUsers)
 	requestMultiplexer.HandleFunc(postLogin, ptrToAppState.PostLogin)
 	requestMultiplexer.HandleFunc(postRefresh, ptrToAppState.PostRefresh)
 	requestMultiplexer.HandleFunc(postRevoke, ptrToAppState.PostRevoke)

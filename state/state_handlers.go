@@ -402,3 +402,72 @@ func (a *APIConfig) PostRevoke(writer http.ResponseWriter, req *http.Request) {
 
 	writer.WriteHeader(http.StatusNoContent)
 }
+
+func (a *APIConfig) PutUsers(writer http.ResponseWriter, req *http.Request) {
+	type requestBody struct {
+		Email string `json:"email"`
+		Password string `json:"password"`
+	}
+	type validResponse struct {
+		ID uuid.UUID `json:"id"`
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
+		Email string `json:"email"`
+	}
+
+	jwtToken, err := auth.GetBearerToken(req.Header)
+	if err != nil {
+		ErrorResponseWriter(writer, UnauthorizedBadJWT)
+		return
+	}
+	userID, err := auth.ValidateJWT(jwtToken, a.SecretKey)
+	if err != nil {
+		ErrorResponseWriter(writer, UnauthorizedBadJWT)
+		return
+	}
+
+	dataReceivedInBytes, err := io.ReadAll(req.Body)
+	if err != nil {
+		ErrorResponseWriter(writer, ServiceError)
+		return
+	}
+	dataReceived := &requestBody{}
+	if err := json.Unmarshal(dataReceivedInBytes, dataReceived); err != nil {
+		ErrorResponseWriter(writer, BadRequest)
+		return
+	}
+	
+	hashedPassword, err := auth.HashPassword(dataReceived.Password)
+	if err != nil {
+		ErrorResponseWriter(writer, ServiceError)
+		return
+	}
+
+	updateUserParams := database.UpdateUserDetailsParams{
+		Email: dataReceived.Email,
+		HashedPassword: hashedPassword,
+		ID: userID,
+	}
+	updatedUserDetails, err := a.PtrToQueries.UpdateUserDetails(req.Context(), updateUserParams)
+	if err != nil {
+		ErrorResponseWriter(writer, DatabaseError)
+		return
+	}
+
+	formattedValidResponse := validResponse{
+		ID: updatedUserDetails.ID,
+		CreatedAt: updatedUserDetails.CreatedAt,
+		UpdatedAt: updatedUserDetails.UpdatedAt,
+		Email: updatedUserDetails.Email,
+	}
+	validResponseInBytes, err := json.Marshal(formattedValidResponse)
+	if err != nil {
+		ErrorResponseWriter(writer, ServiceError)
+		return
+	}
+	writer.Header().Set("Content-Type", "application/json")
+	writer.WriteHeader(http.StatusOK)
+	if _, err := writer.Write(validResponseInBytes); err != nil {
+		ErrorResponseWriter(writer, ServiceError)
+	}
+}
